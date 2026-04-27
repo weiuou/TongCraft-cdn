@@ -1,0 +1,20 @@
+{
+  "name": "tongcraft-cdn",
+  "version": "1.0.0",
+  "description": "CDN for Tongcraft Minecraft server player avatars",
+  "type": "module",
+  "scripts": {
+    "fetch": "node scripts/fetch-avatars.js",
+    "sync": "node scripts/sync-r2.js",
+    "update-meta": "node scripts/update-meta.js",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "web": "node src/server.js",
+    "web:port": "node src/server.js --port"
+  },
+  "dependencies": {
+    "@cloudflare/workers-types": "^4.20240405.0",
+    "jimp": "^1.6.1",
+    "wrangler": "^3.51.2"
+  }
+}

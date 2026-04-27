@@ -1,0 +1,395 @@
+{
+  "players": [
+    {
+      "name": "Wei_uou",
+      "uuid": "288772a1e4a54741ac4caa7b4ceceddd",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Leilan_TC",
+      "uuid": "f2d1dd82a36946aabf67c743eed2b442",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "789456AAB",
+      "uuid": "ec5c5753cf7941d5bcb82cf6766aecd4",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Luckily_H",
+      "uuid": "48b46431c369447eb3d3418208338fe5",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Ebon_Blade_",
+      "uuid": "40d23247db7640e19c2b7f042bf3f362",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.800Z"
+    },
+    {
+      "name": "tongyung1999",
+      "uuid": "7e362cef5fca4b27a70cfb3390e95b1d",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Canonzki",
+      "uuid": "cd96bfb72c724e609d8a2e230cf00789",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "zhengyi233",
+      "uuid": "4c265c5c572e4f3daf34a93de4d5f5eb",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Zhevol_YuMo",
+      "uuid": "dfa7b47cb0ca42e0b3dd95288448e281",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Rezor_x",
+      "uuid": "32ca0c56e3d74027a4b3c6e03e3a5677",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "ccl0202",
+      "uuid": "d3f5671198514f0190968fac2877da6c",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "G_chiyan",
+      "uuid": "3d89c1e9805d441bbbf0a2a92f16571b",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "0snowcat47",
+      "uuid": "18df2a3e127d406c99dc71833464ecb6",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "AituZ",
+      "uuid": "a553e1a984a24d3cb40815530ed907e3",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "KiraWannaPlay",
+      "uuid": "4defb257a9bf4423b6d7fb3994824305",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "z_o_x",
+      "uuid": "4feebcf3ceb648849f487e42c0bfa5e0",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "nbdlf",
+      "uuid": "d38043702ff949c39488c65942b54ff4",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Episode_33",
+      "uuid": "7c44d9d990324a64bf4675548248dbe3",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "aozup",
+      "uuid": "dc3d22bec0864417894cff1ed605701b",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "fu_mo207",
+      "uuid": "231356f48bb24e899bd4760b804665da",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "7PiNNN",
+      "uuid": "8ff7c91bb5dc42b4bd2a0b1d942367da",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Janzhi",
+      "uuid": "0804fac93eac43dc854294aea93da270",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "shengritixing",
+      "uuid": "3c386200e90f4245b39cb868a5993ad4",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Cook_ies",
+      "uuid": "1e631f8db65849d0912d2e2c06e5d56e",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "zhanglu666",
+      "uuid": "40c9e65756644aff90ba293800c68708",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "2Bmao",
+      "uuid": "9a06bbc4536644a8a0691299b8ff2d29",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "wei_ouo",
+      "uuid": "b65b1202add44eb5ad720d4999f3b031",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Max_TAO",
+      "uuid": "904887a1559047828373787dab27c087",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "FaCe_In",
+      "uuid": "93a01e9b65574fdba1b81f3eba3f1d21",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "wx011",
+      "uuid": "9324fb352381432c944c04c31ff7f714",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "mattcli",
+      "uuid": "d55f0809856c415384e93507f5f8a5ae",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "wuyudaodile",
+      "uuid": "1b89f51cec884608959be80a8916daa7",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Kimhelen_Griffi",
+      "uuid": "7f0292984a3742078783a03865518900",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Su7nday",
+      "uuid": "9d10ef1402b146879b147bb413fca919",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Mi_Tian_",
+      "uuid": "becebbc8ec874ecab54ab595f817fbfa",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Sakuraba_Ema",
+      "uuid": "d32cf16779174f469161474e52d6c50c",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "ArthurSirius",
+      "uuid": "b0a58a8a6bf64b1c8faa162e31b3b60c",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "WHITEILY",
+      "uuid": "7fd6ccf450064f82a571f281d6f21e62",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "_Corydalis_",
+      "uuid": "25fa0996eb924ce3a818acc0407fa8b5",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "F_Filippo_O",
+      "uuid": "b5abb537f19a478f990c7aeaf66e28d1",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Ga_laxy",
+      "uuid": "4b6cd823cf574311bdc62533afee564f",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Liming_33",
+      "uuid": "80ab9b99101e4f08bfc720943316c98d",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Nus_FuShu",
+      "uuid": "40f453790e124810a168537a2ce4ef8b",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "lhx2010",
+      "uuid": "e0b4b839e06a4c3da35ae60c45069ed0",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "suin",
+      "uuid": "aba7e21f682240c2ab03913c182d185f",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "pimiao",
+      "uuid": "b00bd6f24aa54d77b71a3011d2e098e3",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "ZJJT",
+      "uuid": "8daf914a29134feb87e58bb4d3477dee",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "PlutoniumSd",
+      "uuid": "af122dea602a4bd2bf0b0ab1087f276a",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "dampling",
+      "uuid": "e396927080614aaf9e2ca35a32399479",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "CLSherlock",
+      "uuid": "cc6f39e6d4b74769af76de7c74d9260c",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "MEorpheus",
+      "uuid": "f1587ebe082b4d1e86a69f919a00dacd",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "lolitasaikou",
+      "uuid": "6cae350d14ae41f697c631dfb8bb3659",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "kuansi",
+      "uuid": "4ef56129d1e741cfa97f79469ef2663c",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Prime_Guilt",
+      "uuid": "1efdf750522e416490e210a2779ce5d3",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Furry_Xiao9xleft",
+      "uuid": "3fff2f447dfb409facd6f968885c387d",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "NorthGodz",
+      "uuid": "fa81397a524c427c9ac63748c342a6ee",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Jianrang",
+      "uuid": "725cef9ea3c640759334e2d21a43125c",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "758_lk",
+      "uuid": "5530b084c694435c8d865421566882dd",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Nine_Night_",
+      "uuid": "9ddd6039c53949c1ac769c72660a4067",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "qingshangzui",
+      "uuid": "03ab1a61aad54944af9d8dbb7c552761",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "KANo_N4No",
+      "uuid": "f15eb8d0bf3a45f1bc6a05eb99f0c1fe",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "6un1e",
+      "uuid": "ef9b9971534340df82492efa52b0b5bd",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "JM_H",
+      "uuid": "d2ff81cbdd0f49458c0e1b7e1d337ee0",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "Maikam",
+      "uuid": "01bf84b027b84ca6970ad5c436245ec8",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    },
+    {
+      "name": "WhiteFeather1",
+      "uuid": "eeb1e93b0adc4e1b869193f9c6571f3a",
+      "hasAvatar": true,
+      "avatarUpdatedAt": "2026-04-27T07:55:24.804Z"
+    }
+  ],
+  "lastUpdated": "2026-04-27T07:55:38.244Z"
+}
