@@ -24,6 +24,7 @@ TongCraft-cdn/
 │   └── avatars-meta.json        # 头像生成元数据
 ├── scripts/
 │   ├── fetch-avatars.js         # 拉取皮肤并生成头像
+│   ├── add-player.js            # 按玩家名添加玩家
 │   ├── check-3d-viewer.js       # Playwright 3D 查看器检查
 │   ├── sync-r2.js               # 同步到 Cloudflare R2
 │   └── update-meta.js           # 更新元数据
@@ -41,6 +42,22 @@ npm install
 ```
 
 ## 常用命令
+
+### 添加玩家
+
+按玩家名添加一个玩家：
+
+```bash
+npm run add-player -- 玩家名
+```
+
+一次添加多个玩家：
+
+```bash
+npm run add-player -- "玩家名1, 玩家名2 玩家名3"
+```
+
+脚本会通过 Mojang API 查询正版 UUID，并写入 `data/players.json`。
 
 ### 拉取皮肤并生成头像
 
@@ -122,14 +139,25 @@ npm run check:3d
 触发方式：
 
 - 推送到 `main` 分支。
+- 每天自动运行一次，用于刷新所有玩家的皮肤和头像。
 - 在 GitHub Actions 页面手动运行 `Deploy GitHub Pages`。
+
+手动运行时可以填写 `players` 输入框：
+
+```text
+Wei_uou, Player2 Player3
+```
+
+填写后工作流会先把这些玩家加入 `data/players.json`，再拉取头像和皮肤并部署页面；新增玩家数据会自动提交回仓库。留空运行则只刷新已有玩家的皮肤。
 
 工作流会自动执行：
 
 1. 安装依赖。
-2. 运行 `npm run fetch` 拉取最新玩家头像和皮肤。
-3. 运行 `npm run build:pages` 导出静态站点。
-4. 上传 `dist/` 并部署到 GitHub Pages。
+2. 如果手动输入了玩家名，运行 `npm run add-player` 更新玩家列表。
+3. 运行 `npm run fetch` 拉取最新玩家头像和皮肤。
+4. 如果添加了新玩家，提交更新后的 `data/players.json` 和 `data/avatars-meta.json`。
+5. 运行 `npm run build:pages` 导出静态站点。
+6. 上传 `dist/` 并部署到 GitHub Pages。
 
 首次使用需要在 GitHub 仓库中开启 Pages：
 

@@ -4,10 +4,17 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: '17 20 * * *'
   workflow_dispatch:
+    inputs:
+      players:
+        description: '要添加的玩家名，多个玩家可用空格、逗号或换行分隔；留空则只刷新已有玩家皮肤'
+        required: false
+        type: string
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -31,8 +38,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Add players from manual input
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.players != '' }}
+        env:
+          PLAYERS_INPUT: ${{ inputs.players }}
+        run: npm run add-player -- "$PLAYERS_INPUT"
+
       - name: Fetch player avatars and skins
         run: npm run fetch
+
+      - name: Commit updated player data
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.players != '' }}
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'chore: add players from workflow'
+          file_pattern: data/players.json data/avatars-meta.json
 
       - name: Build static site
         run: npm run build:pages

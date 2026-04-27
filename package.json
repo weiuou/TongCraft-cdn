@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "fetch": "node scripts/fetch-avatars.js",
+    "add-player": "node scripts/add-player.js",
     "sync": "node scripts/sync-r2.js",
     "update-meta": "node scripts/update-meta.js",
     "build:pages": "cross-env STATIC_EXPORT=1 node src/server.js",

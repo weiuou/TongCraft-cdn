@@ -3,6 +3,7 @@
  * 
  * Usage:
  *   node scripts/add-player.js <name> [uuid]
+ *   node scripts/add-player.js "Player1, Player2, Player3"
  *   node scripts/add-player.js --file players.txt
  */
 
@@ -30,7 +31,7 @@ async function loadPlayers() {
  * Save player data
  */
 async function savePlayers(data) {
-  await fs.writeFile(PLAYERS_FILE, JSON.stringify(data, null, 2));
+  await fs.writeFile(PLAYERS_FILE, JSON.stringify(data, null, 2) + '\n');
 }
 
 /**
@@ -52,12 +53,12 @@ async function addPlayer(name, uuid = null) {
   const playersData = await loadPlayers();
   
   // Check if player already exists
-  const existing = playersData.players.find(p => 
-    p.name.toLowerCase() === name.toLowerCase()
+  const existing = playersData.players.find(p =>
+    p.name.toLowerCase() === name.toLowerCase() || p.uuid === uuid
   );
-  
+
   if (existing) {
-    console.log(`Player already exists: ${name}`);
+    console.log(`Player already exists: ${existing.name} (${existing.uuid})`);
     return false;
   }
   
@@ -65,6 +66,7 @@ async function addPlayer(name, uuid = null) {
   if (!uuid) {
     try {
       const result = await getUUID(name);
+      name = result.name;
       uuid = result.uuid;
       console.log(`  UUID: ${uuid}`);
     } catch (error) {
@@ -95,7 +97,7 @@ async function addPlayersFromFile(filePath) {
   
   let added = 0;
   for (const line of lines) {
-    const parts = line.trim().split(/[,\s]+/);
+    const parts = line.trim().split(/[,\s]+/).filter(Boolean);
     const name = parts[0];
     const uuid = parts[1] || null;
     
@@ -116,6 +118,7 @@ async function main() {
   if (args.length === 0) {
     console.log('Usage:');
     console.log('  node scripts/add-player.js <name> [uuid]');
+    console.log('  node scripts/add-player.js "Player1, Player2, Player3"');
     console.log('  node scripts/add-player.js --file players.txt');
     process.exit(1);
   }
@@ -132,9 +135,14 @@ async function main() {
     const added = await addPlayersFromFile(filePath);
     console.log(`\nDone! Added ${added} player(s).`);
   } else {
-    const name = args[0];
-    const uuid = args[1] || null;
-    await addPlayer(name, uuid);
+    const input = args[0];
+    const uuid = args.length === 2 ? args[1] : null;
+    const names = uuid ? [input] : input.split(/[,\n\s]+/).filter(Boolean);
+    let added = 0;
+    for (const name of names) {
+      if (await addPlayer(name, uuid)) added++;
+    }
+    console.log(`\nDone! Added ${added} player(s).`);
   }
 }
 
