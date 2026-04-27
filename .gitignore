@@ -1,22 +1,27 @@
-# Dependencies
+# 依赖
 node_modules/
 
-# Environment variables
+# 环境变量
 .env
 .env.local
 .env.*.local
 
-# Avatars (synced to R2, don't commit large files)
-avatars/*.png
+# 本地生成的头像和皮肤资源
+avatars/
+skins/
 
-# Build output
+# 构建与测试输出
 dist/
 .wrangler/
+playwright-results/
 
-# OS files
+# Claude Code 本地状态
+.claude/
+
+# 系统文件
 .DS_Store
 Thumbs.db
 
-# IDE
+# 编辑器
 .vscode/
 .idea/

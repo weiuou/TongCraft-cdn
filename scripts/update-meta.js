@@ -61,7 +61,10 @@ async function generateMeta() {
       filename,
       size: stat.size,
       createdAt: stat.birthtime.toISOString(),
-      updatedAt: stat.mtime.toISOString()
+      updatedAt: stat.mtime.toISOString(),
+      skinModel: player?.skinModel || meta[uuid]?.skinModel || null,
+      skinUrl: player?.skinUrl || meta[uuid]?.skinUrl || null,
+      skinTextureUpdatedAt: player?.skinTextureUpdatedAt || meta[uuid]?.skinTextureUpdatedAt || null
     };
   }
   
@@ -116,6 +119,11 @@ async function main() {
     if (meta[player.uuid]) {
       player.hasAvatar = true;
       player.avatarUpdatedAt = meta[player.uuid].updatedAt;
+      if (meta[player.uuid].skinModel) player.skinModel = meta[player.uuid].skinModel;
+      if (meta[player.uuid].skinUrl) player.skinUrl = meta[player.uuid].skinUrl;
+      if (meta[player.uuid].skinTextureUpdatedAt) {
+        player.skinTextureUpdatedAt = meta[player.uuid].skinTextureUpdatedAt;
+      }
     } else {
       player.hasAvatar = false;
     }
