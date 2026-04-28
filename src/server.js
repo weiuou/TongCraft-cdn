@@ -46,7 +46,7 @@ function generateHTML(players, count) {
     const img = has ? `<img src="${assetPath(`/avatars/${uuid}.png`)}" loading="lazy" alt="${name}">` : `<div class="na">${name[0] || '?'}</div>`;
     const model = escapeHTML(p.skinModel || 'unknown');
     const texture = p.skinUrl ? 'Texture ready' : 'Name lookup';
-    return `<article class="card" data-name="${name.toLowerCase()}" data-uuid="${uuid}">
+    return `<article class="card" data-name="${name.toLowerCase()}" data-uuid="${uuid}" onclick="summonMascotFromCard(event,'${uuid}')">
       <div class="avatar">${img}</div>
       <div class="brand">${name}</div>
       <div class="meta">${model} · ${texture}</div>
@@ -120,6 +120,9 @@ body.dark .actions .swatch{background:#f5f5f5;color:#111}
 .mascot:active{cursor:grabbing}
 .mascot canvas{position:absolute;inset:0;width:100%;height:100%;display:block;filter:drop-shadow(0 18px 18px rgba(0,0,0,.18))}
 .mascot-loading{display:none}
+.mascot-bubble{position:absolute;right:72%;top:24%;max-width:190px;padding:8px 11px;background:rgba(17,17,17,.88);color:#fff;border:1px solid rgba(255,255,255,.14);border-radius:8px;font-family:Minecraft,Minecraftia,"Press Start 2P","Courier New",ui-monospace,monospace;font-size:12px;font-weight:700;line-height:1.45;text-shadow:1px 1px 0 rgba(0,0,0,.75);box-shadow:0 12px 28px rgba(0,0,0,.22);pointer-events:none;opacity:0;transform:translateY(8px);transition:opacity .18s,transform .18s;white-space:normal;image-rendering:pixelated}
+.mascot-bubble.on{opacity:1;transform:translateY(0)}
+body.dark .mascot-bubble{background:rgba(245,245,245,.9);color:#111;border-color:rgba(0,0,0,.12);text-shadow:1px 1px 0 rgba(255,255,255,.55)}
 @media (max-width:780px){.mascot{width:220px;height:330px;left:calc(100vw - 228px);top:calc(100vh - 346px)}}
 @media (max-width:720px){
   .viewer-backdrop{padding:12px}
@@ -155,17 +158,20 @@ body.dark .actions .swatch{background:#f5f5f5;color:#111}
 <script>
 function toast(message){var t=document.getElementById('t');t.textContent=message;t.classList.add('on');setTimeout(function(){t.classList.remove('on')},1400)}
 function giveCommand(uuid){var p=(window.__PLAYERS__||[]).find(function(player){return player.uuid===uuid});var id=p&&p.name?p.name:uuid;return '/give @p minecraft:player_head[minecraft:profile='+JSON.stringify(id)+'] 1'}
-function copyText(text,message){navigator.clipboard.writeText(text).then(function(){toast(message)})}
+function mascotSay(message){window.dispatchEvent(new CustomEvent('mascot-say',{detail:{message:message}}))}
+function summonMascot(uuid,message){window.dispatchEvent(new CustomEvent('summon-mascot',{detail:{uuid:uuid,message:message}}))}
+function summonMascotFromCard(event,uuid){if(event.target.closest('button'))return;var p=(window.__PLAYERS__||[]).find(function(player){return player.uuid===uuid});summonMascot(uuid,(p&&p.name?p.name:uuid)+' 加入了大厅')}
+function copyText(text,message){navigator.clipboard.writeText(text).then(function(){toast(message);mascotSay('复制好了！')})}
 function copyAvatar(uuid){copyText(new URL('avatars/'+uuid+'.png', location.href).href,'头像 URL 已复制')}
 function copyGive(uuid){copyText(giveCommand(uuid),'give 头颅指令已复制')}
 function copyVisibleGive(){var commands=Array.from(document.querySelectorAll('.card')).filter(function(c){return c.style.display!=='none'}).map(function(c){return giveCommand(c.dataset.uuid)});copyText(commands.join(String.fromCharCode(10)),commands.length+' 条 give 指令已复制')}
 function f(){var q=document.getElementById('q').value.toLowerCase(),n=0;document.querySelectorAll('.card').forEach(function(c){var show=(c.dataset.name+' '+c.dataset.uuid).includes(q);c.style.display=show?'':'none';if(show)n++});document.getElementById('cnt').textContent=n+' players'}
 function sortCards(key){var grid=document.getElementById('grid');Array.from(grid.children).sort(function(a,b){return a.dataset[key].localeCompare(b.dataset[key])}).forEach(function(card){grid.appendChild(card)});document.getElementById('sortName').classList.toggle('on',key==='name');document.getElementById('sortUuid').classList.toggle('on',key==='uuid')}
-function setTheme(dark){document.body.classList.toggle('dark',dark);localStorage.setItem('theme',dark?'dark':'light')}
+function setTheme(dark){document.body.classList.toggle('dark',dark);localStorage.setItem('theme',dark?'dark':'light');window.dispatchEvent(new CustomEvent('theme-changed',{detail:{dark:dark}}))}
 function toggleTheme(){setTheme(!document.body.classList.contains('dark'))}
 function open3d(uuid){window.dispatchEvent(new CustomEvent('open-3d-viewer',{detail:{uuid:uuid}}))}
 function toggleMascot(){window.dispatchEvent(new CustomEvent('toggle-mascot'))}
-window.copyAvatar=copyAvatar;window.copyGive=copyGive;window.copyVisibleGive=copyVisibleGive;window.f=f;window.sortCards=sortCards;window.setTheme=setTheme;window.toggleTheme=toggleTheme;window.open3d=open3d;window.toggleMascot=toggleMascot;
+window.copyAvatar=copyAvatar;window.copyGive=copyGive;window.copyVisibleGive=copyVisibleGive;window.f=f;window.sortCards=sortCards;window.setTheme=setTheme;window.toggleTheme=toggleTheme;window.open3d=open3d;window.toggleMascot=toggleMascot;window.summonMascotFromCard=summonMascotFromCard;
 setTheme(localStorage.getItem('theme')==='dark')
 </script>
 <script type="module">
@@ -359,6 +365,15 @@ function animateBones(group, action, elapsed) {
     rightLeg.rotation.x = -0.22;
     leftLeg.rotation.x = -0.22;
   }
+}
+
+function applyMascotLook(group, look) {
+  const head = group.getObjectByName('head');
+  const body = group.getObjectByName('body');
+  if (!head || !body) return;
+  head.rotation.y += look.x * 0.28;
+  head.rotation.x += look.y * 0.16;
+  body.rotation.y += look.x * 0.035;
 }
 
 function buildPlayer(group, img, model, uuid, options = {}) {
@@ -630,11 +645,11 @@ function ViewerModal() {
 
 const MASCOT_STORE = 'tongcraft-mascot-v2';
 const MASCOT_ACTIONS = [
-  ['idle', 'Idle'],
-  ['wave', 'Wave'],
-  ['walk', 'Walk'],
-  ['run', 'Run'],
-  ['crouch', 'Crouch']
+  ['idle', '待机'],
+  ['wave', '招手'],
+  ['walk', '走走'],
+  ['run', '跑跑'],
+  ['crouch', '潜行']
 ];
 
 function clamp(value, min, max) {
@@ -678,13 +693,36 @@ function readMascotState() {
 function MascotWidget() {
   const [state, setState] = useState(readMascotState);
   const [loading, setLoading] = useState(false);
+  const [bubble, setBubble] = useState(null);
   const canvasRef = useRef(null);
   const mascotRef = useRef(null);
   const sceneRef = useRef(null);
   const actionRef = useRef(state.animation);
   const yawRef = useRef(state.yaw);
+  const lookRef = useRef({ x: 0, y: 0 });
   const dragRef = useRef(null);
+  const bubbleTimerRef = useRef(0);
+  const lastActivityRef = useRef(Date.now());
+  const idleReturnRef = useRef(0);
   const player = useMemo(() => players.find(p => p.uuid === state.uuid) || players[0], [state.uuid]);
+
+  const rememberActivity = () => {
+    lastActivityRef.current = Date.now();
+  };
+
+  const say = (message, duration = 2200) => {
+    if (!message) return;
+    window.clearTimeout(bubbleTimerRef.current);
+    setBubble({ message, on: true });
+    bubbleTimerRef.current = window.setTimeout(() => {
+      setBubble(current => current ? { ...current, on: false } : current);
+    }, duration);
+  };
+
+  useEffect(() => () => {
+    window.clearTimeout(bubbleTimerRef.current);
+    window.clearTimeout(idleReturnRef.current);
+  }, []);
 
   useEffect(() => {
     actionRef.current = state.animation;
@@ -704,6 +742,83 @@ function MascotWidget() {
     window.addEventListener('toggle-mascot', onToggle);
     return () => window.removeEventListener('toggle-mascot', onToggle);
   }, []);
+
+  useEffect(() => {
+    const onSummon = event => {
+      const uuid = event.detail?.uuid;
+      if (!uuid || !players.some(p => p.uuid === uuid)) return;
+      rememberActivity();
+      setState(current => ({ ...current, uuid, animation: 'wave', hidden: false }));
+      say(event.detail?.message || '你好呀！');
+    };
+    const onSay = event => say(event.detail?.message);
+    const onTheme = event => {
+      rememberActivity();
+      setState(current => ({ ...current, animation: 'wave', hidden: false }));
+      say(event.detail?.dark ? '夜晚模式开启！' : '白天模式开启！');
+    };
+    window.addEventListener('summon-mascot', onSummon);
+    window.addEventListener('mascot-say', onSay);
+    window.addEventListener('theme-changed', onTheme);
+    return () => {
+      window.removeEventListener('summon-mascot', onSummon);
+      window.removeEventListener('mascot-say', onSay);
+      window.removeEventListener('theme-changed', onTheme);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onPointerMove = event => {
+      if (!mascotRef.current) return;
+      const box = mascotRef.current.getBoundingClientRect();
+      const cx = box.left + box.width / 2;
+      const cy = box.top + box.height * 0.38;
+      lookRef.current = {
+        x: clamp((event.clientX - cx) / Math.max(220, window.innerWidth * 0.35), -1, 1),
+        y: clamp((event.clientY - cy) / Math.max(180, window.innerHeight * 0.28), -1, 1)
+      };
+      window.__mascotLook = lookRef.current;
+    };
+    window.addEventListener('pointermove', onPointerMove);
+    return () => window.removeEventListener('pointermove', onPointerMove);
+  }, []);
+
+  useEffect(() => {
+    const onActivity = () => rememberActivity();
+    ['pointerdown', 'keydown', 'scroll'].forEach(type => window.addEventListener(type, onActivity, { passive: true }));
+    window.addEventListener('wheel', onActivity, { passive: true });
+    return () => {
+      ['pointerdown', 'keydown', 'scroll'].forEach(type => window.removeEventListener(type, onActivity));
+      window.removeEventListener('wheel', onActivity);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (state.hidden) return;
+    const options = [
+      ['idle', '我在到处看看。'],
+      ['wave', '你好呀！'],
+      ['walk', '活动一下腿。'],
+      ['crouch', '正在潜行...']
+    ];
+    const timer = window.setInterval(() => {
+      if (Date.now() - lastActivityRef.current < 12000 || dragRef.current) return;
+      const [animation, message] = options[Math.floor(Math.random() * options.length)];
+      setState(current => ({ ...current, animation }));
+      say(message, 1800);
+      window.clearTimeout(idleReturnRef.current);
+      if (animation !== 'idle') {
+        idleReturnRef.current = window.setTimeout(() => {
+          setState(current => ({ ...current, animation: 'idle' }));
+        }, 3200);
+      }
+      lastActivityRef.current = Date.now() - 5000;
+    }, 7000);
+    return () => {
+      window.clearInterval(timer);
+      window.clearTimeout(idleReturnRef.current);
+    };
+  }, [state.hidden]);
 
   useEffect(() => {
     const onResize = () => {
@@ -768,6 +883,7 @@ function MascotWidget() {
       if (actionRef.current === 'idle') {
         playerGroup.rotation.y += Math.sin(elapsed * 0.7) * 0.12;
       }
+      applyMascotLook(playerGroup, lookRef.current);
       renderer.render(scene, camera);
     };
     animate();
@@ -803,18 +919,24 @@ function MascotWidget() {
 
   const nextAction = () => {
     const index = MASCOT_ACTIONS.findIndex(([value]) => value === actionRef.current);
-    const next = MASCOT_ACTIONS[(index + 1) % MASCOT_ACTIONS.length][0];
+    const [next, label] = MASCOT_ACTIONS[(index + 1) % MASCOT_ACTIONS.length];
+    rememberActivity();
     patchState({ animation: next });
+    say(label + '！');
   };
 
   const nextPlayer = () => {
     if (!players.length) return;
     const index = players.findIndex(p => p.uuid === player.uuid);
-    patchState({ uuid: players[(index + 1) % players.length].uuid });
+    const next = players[(index + 1) % players.length];
+    rememberActivity();
+    patchState({ uuid: next.uuid, animation: 'wave' });
+    say(next.name + ' 加入了大厅');
   };
 
   const startDrag = event => {
     if (event.button !== 0) return;
+    rememberActivity();
     dragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -852,9 +974,10 @@ function MascotWidget() {
   };
 
   const resizeBy = delta => {
+    rememberActivity();
     patchState({
-      width: clamp(state.width + delta, 160, 360),
-      height: clamp(state.height + delta * 1.5, 240, 540)
+      width: clamp(state.width + delta, 220, 420),
+      height: clamp(state.height + delta * 1.5, 330, 630)
     });
   };
 
@@ -878,7 +1001,8 @@ function MascotWidget() {
     }
   },
     h('canvas', { ref: canvasRef }),
-    loading ? h('div', { className: 'mascot-loading' }, 'Loading...') : null
+    loading ? h('div', { className: 'mascot-loading' }, 'Loading...') : null,
+    bubble ? h('div', { className: 'mascot-bubble' + (bubble.on ? ' on' : '') }, bubble.message) : null
   );
 }
 
