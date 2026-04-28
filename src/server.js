@@ -116,6 +116,11 @@ body.dark .actions .swatch{background:#f5f5f5;color:#111}
 .viewer-stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .viewer-loading{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:13px;color:#888;pointer-events:none}
 .viewer-hint{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);font-size:12px;color:#666;pointer-events:none;white-space:nowrap}
+.mascot{position:fixed;left:calc(100vw - 292px);top:calc(100vh - 444px);z-index:80;width:284px;height:426px;cursor:grab;touch-action:none;user-select:none;overflow:visible}
+.mascot:active{cursor:grabbing}
+.mascot canvas{position:absolute;inset:0;width:100%;height:100%;display:block;filter:drop-shadow(0 18px 18px rgba(0,0,0,.18))}
+.mascot-loading{display:none}
+@media (max-width:780px){.mascot{width:220px;height:330px;left:calc(100vw - 228px);top:calc(100vh - 346px)}}
 @media (max-width:720px){
   .viewer-backdrop{padding:12px}
   .viewer-modal{height:calc(100vh - 24px);grid-template-columns:1fr;grid-template-rows:auto 1fr}
@@ -124,7 +129,7 @@ body.dark .actions .swatch{background:#f5f5f5;color:#111}
 </style></head><body>
 <header>
   <div><h1>Tongcraft Heads</h1><p>${players.length} 个玩家头颅 · ${count} 张头像缓存</p></div>
-  <div class="header-actions"><button type="button" onclick="toggleTheme()">◐ 主题</button><button type="button" onclick="copyVisibleGive()">⛏ 复制当前指令</button></div>
+  <div class="header-actions"><button type="button" onclick="toggleMascot()">Mascot</button><button type="button" onclick="toggleTheme()">◐ 主题</button><button type="button" onclick="copyVisibleGive()">⛏ 复制当前指令</button></div>
 </header>
 <div class="bar">
   <label class="control">搜索<input id="q" placeholder="按玩家名或 UUID 搜索..." oninput="f()"></label>
@@ -135,6 +140,7 @@ body.dark .actions .swatch{background:#f5f5f5;color:#111}
 <div class="g" id="grid">${cards}</div>
 <div class="t" id="t">Copied!</div>
 <div id="viewer-root"></div>
+<div id="mascot-root"></div>
 <script type="importmap">
 {
   "imports": {
@@ -158,7 +164,8 @@ function sortCards(key){var grid=document.getElementById('grid');Array.from(grid
 function setTheme(dark){document.body.classList.toggle('dark',dark);localStorage.setItem('theme',dark?'dark':'light')}
 function toggleTheme(){setTheme(!document.body.classList.contains('dark'))}
 function open3d(uuid){window.dispatchEvent(new CustomEvent('open-3d-viewer',{detail:{uuid:uuid}}))}
-window.copyAvatar=copyAvatar;window.copyGive=copyGive;window.copyVisibleGive=copyVisibleGive;window.f=f;window.sortCards=sortCards;window.setTheme=setTheme;window.toggleTheme=toggleTheme;window.open3d=open3d;
+function toggleMascot(){window.dispatchEvent(new CustomEvent('toggle-mascot'))}
+window.copyAvatar=copyAvatar;window.copyGive=copyGive;window.copyVisibleGive=copyVisibleGive;window.f=f;window.sortCards=sortCards;window.setTheme=setTheme;window.toggleTheme=toggleTheme;window.open3d=open3d;window.toggleMascot=toggleMascot;
 setTheme(localStorage.getItem('theme')==='dark')
 </script>
 <script type="module">
@@ -333,10 +340,12 @@ function animateBones(group, action, elapsed) {
   }
 
   if (action === 'wave') {
-    rightArm.rotation.z = -1.25 + Math.sin(elapsed * 7) * 0.35;
-    rightArm.rotation.x = -0.15;
-    leftArm.rotation.x = 0.12;
-    head.rotation.z = Math.sin(elapsed * 2.4) * 0.08;
+    const sway = Math.sin(elapsed * 5.8);
+    rightArm.rotation.z = -2.55 + sway * 0.22;
+    rightArm.rotation.x = -0.08 + Math.sin(elapsed * 3.2) * 0.06;
+    body.rotation.z = Math.sin(elapsed * 1.8) * 0.025;
+    leftArm.rotation.x = 0.1;
+    head.rotation.z = Math.sin(elapsed * 2.1) * 0.045;
     return;
   }
 
@@ -352,7 +361,7 @@ function animateBones(group, action, elapsed) {
   }
 }
 
-function buildPlayer(group, img, model, uuid) {
+function buildPlayer(group, img, model, uuid, options = {}) {
   while (group.children.length) group.remove(group.children[0]);
   const S = 1 / 8;
   const skin = makeSkinCanvas(img);
@@ -372,7 +381,9 @@ function buildPlayer(group, img, model, uuid) {
     ? { front:[52,52], back:[59,52], left:[48,52], right:[56,52], top:[52,48], bottom:[55,48] }
     : { front:[52,52], back:[60,52], left:[48,52], right:[56,52], top:[52,48], bottom:[56,48] };
 
-  window.__viewerState = { uuid, skinModel: slim ? 'slim' : 'classic', sourceModel: model || 'fallback', armWidth };
+  if (!options.silent) {
+    window.__viewerState = { uuid, skinModel: slim ? 'slim' : 'classic', sourceModel: model || 'fallback', armWidth };
+  }
 
   const headGroup = new THREE.Group();
   headGroup.name = 'head';
@@ -617,7 +628,262 @@ function ViewerModal() {
   );
 }
 
+const MASCOT_STORE = 'tongcraft-mascot-v2';
+const MASCOT_ACTIONS = [
+  ['idle', 'Idle'],
+  ['wave', 'Wave'],
+  ['walk', 'Walk'],
+  ['run', 'Run'],
+  ['crouch', 'Crouch']
+];
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function defaultMascotState() {
+  return {
+    left: Math.max(16, window.innerWidth - 292),
+    top: Math.max(16, window.innerHeight - 444),
+    width: window.innerWidth < 780 ? 220 : 284,
+    height: window.innerWidth < 780 ? 330 : 426,
+    uuid: players[0]?.uuid || '',
+    animation: 'idle',
+    yaw: -0.22,
+    hidden: false
+  };
+}
+
+function readMascotState() {
+  const fallback = defaultMascotState();
+  try {
+    const saved = JSON.parse(localStorage.getItem(MASCOT_STORE) || '{}');
+    return {
+      ...fallback,
+      ...saved,
+      left: clamp(Number(saved.left ?? fallback.left), 8, window.innerWidth - 72),
+      top: clamp(Number(saved.top ?? fallback.top), 8, window.innerHeight - 72),
+      width: clamp(Number(saved.width ?? fallback.width), 220, 420),
+      height: clamp(Number(saved.height ?? fallback.height), 330, 630),
+      uuid: players.some(player => player.uuid === saved.uuid) ? saved.uuid : fallback.uuid,
+      animation: ANIMATIONS.some(([value]) => value === saved.animation) ? saved.animation : fallback.animation,
+      yaw: Number.isFinite(Number(saved.yaw)) ? Number(saved.yaw) : fallback.yaw,
+      hidden: Boolean(saved.hidden)
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function MascotWidget() {
+  const [state, setState] = useState(readMascotState);
+  const [loading, setLoading] = useState(false);
+  const canvasRef = useRef(null);
+  const mascotRef = useRef(null);
+  const sceneRef = useRef(null);
+  const actionRef = useRef(state.animation);
+  const yawRef = useRef(state.yaw);
+  const dragRef = useRef(null);
+  const player = useMemo(() => players.find(p => p.uuid === state.uuid) || players[0], [state.uuid]);
+
+  useEffect(() => {
+    actionRef.current = state.animation;
+  }, [state.animation]);
+
+  useEffect(() => {
+    yawRef.current = state.yaw;
+  }, [state.yaw]);
+
+  useEffect(() => {
+    localStorage.setItem(MASCOT_STORE, JSON.stringify(state));
+    window.__mascotState = state;
+  }, [state]);
+
+  useEffect(() => {
+    const onToggle = () => setState(current => ({ ...current, hidden: !current.hidden }));
+    window.addEventListener('toggle-mascot', onToggle);
+    return () => window.removeEventListener('toggle-mascot', onToggle);
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => {
+      setState(current => ({
+        ...current,
+        left: clamp(current.left, 8, window.innerWidth - 72),
+        top: clamp(current.top, 8, window.innerHeight - 72)
+      }));
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    if (state.hidden || !mascotRef.current) return;
+    const el = mascotRef.current;
+    const onWheel = event => {
+      event.preventDefault();
+      event.stopPropagation();
+      resizeBy(event.deltaY > 0 ? -12 : 12);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [state.hidden, state.width, state.height]);
+
+  useEffect(() => {
+    if (state.hidden || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.setClearColor(0x000000, 0);
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+    camera.position.set(0, 0, 6.9);
+    camera.lookAt(0, 0, 0);
+    const playerGroup = new THREE.Group();
+    playerGroup.position.y = 0;
+    playerGroup.rotation.y = yawRef.current;
+    scene.add(playerGroup);
+    scene.add(new THREE.AmbientLight(0xffffff, 1.25));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    dirLight.position.set(2, 4, 3);
+    scene.add(dirLight);
+
+    const resize = () => {
+      const box = canvas.parentElement.getBoundingClientRect();
+      renderer.setSize(box.width, box.height, false);
+      camera.aspect = box.width / box.height;
+      camera.updateProjectionMatrix();
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const clock = new THREE.Clock();
+    let frame = 0;
+    const animate = () => {
+      frame = requestAnimationFrame(animate);
+      const elapsed = clock.getElapsedTime();
+      animateBones(playerGroup, actionRef.current, elapsed);
+      playerGroup.rotation.y = yawRef.current;
+      if (actionRef.current === 'idle') {
+        playerGroup.rotation.y += Math.sin(elapsed * 0.7) * 0.12;
+      }
+      renderer.render(scene, camera);
+    };
+    animate();
+    sceneRef.current = { playerGroup, resize };
+
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('resize', resize);
+      renderer.dispose();
+      sceneRef.current = null;
+    };
+  }, [state.hidden]);
+
+  useEffect(() => {
+    if (state.hidden || !player || !sceneRef.current) return;
+    setLoading(true);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      buildPlayer(sceneRef.current.playerGroup, img, player.skinModel, player.uuid, { silent: true });
+      applyPartVisibility(sceneRef.current.playerGroup, DEFAULT_VISIBILITY);
+      sceneRef.current.resize();
+      setLoading(false);
+    };
+    img.onerror = () => {
+      if (player.skinUrl && img.src !== player.skinUrl) img.src = player.skinUrl;
+      else setLoading(false);
+    };
+    img.src = 'skins/' + player.uuid + '.png?' + Date.now();
+  }, [state.hidden, player]);
+
+  const patchState = patch => setState(current => ({ ...current, ...patch }));
+
+  const nextAction = () => {
+    const index = MASCOT_ACTIONS.findIndex(([value]) => value === actionRef.current);
+    const next = MASCOT_ACTIONS[(index + 1) % MASCOT_ACTIONS.length][0];
+    patchState({ animation: next });
+  };
+
+  const nextPlayer = () => {
+    if (!players.length) return;
+    const index = players.findIndex(p => p.uuid === player.uuid);
+    patchState({ uuid: players[(index + 1) % players.length].uuid });
+  };
+
+  const startDrag = event => {
+    if (event.button !== 0) return;
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      left: state.left,
+      top: state.top,
+      yaw: state.yaw,
+      mode: event.shiftKey ? 'rotate' : 'move',
+      moved: false
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const drag = event => {
+    const dragState = dragRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+    const dx = event.clientX - dragState.startX;
+    const dy = event.clientY - dragState.startY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragState.moved = true;
+    if (dragState.mode === 'rotate') {
+      patchState({ yaw: dragState.yaw + dx * 0.012 });
+    } else {
+      patchState({
+        left: clamp(dragState.left + dx, 8, window.innerWidth - 72),
+        top: clamp(dragState.top + dy, 8, window.innerHeight - 72)
+      });
+    }
+  };
+
+  const stopDrag = event => {
+    if (dragRef.current?.pointerId !== event.pointerId) return;
+    const wasDrag = dragRef.current.moved;
+    dragRef.current = null;
+    if (!wasDrag) nextAction();
+  };
+
+  const resizeBy = delta => {
+    patchState({
+      width: clamp(state.width + delta, 160, 360),
+      height: clamp(state.height + delta * 1.5, 240, 540)
+    });
+  };
+
+  if (!player || state.hidden) return null;
+
+  return h('section', {
+    ref: mascotRef,
+    className: 'mascot',
+    style: { left: state.left, top: state.top, width: state.width, height: state.height },
+    'aria-label': 'Experimental mascot',
+    title: 'Drag to move, Shift+drag left/right to rotate, click to change action, wheel to resize, double click to change player',
+    onPointerDown: startDrag,
+    onPointerMove: drag,
+    onPointerUp: stopDrag,
+    onPointerCancel: stopDrag,
+    onWheel: event => event.preventDefault(),
+    onDoubleClick: nextPlayer,
+    onContextMenu: event => {
+      event.preventDefault();
+      nextPlayer();
+    }
+  },
+    h('canvas', { ref: canvasRef }),
+    loading ? h('div', { className: 'mascot-loading' }, 'Loading...') : null
+  );
+}
+
 createRoot(document.getElementById('viewer-root')).render(h(ViewerModal));
+createRoot(document.getElementById('mascot-root')).render(h(MascotWidget));
 window.__reactViewerReady = true;
 </script></body></html>`;
 }
