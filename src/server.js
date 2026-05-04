@@ -10,6 +10,7 @@ const SKINS_DIR = path.join(__dirname, '..', 'skins');
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const VISIT_COUNTER_NAMESPACE = process.env.VISIT_COUNTER_NAMESPACE || 'weiuou';
 const VISIT_COUNTER_KEY = process.env.VISIT_COUNTER_KEY || 'tongcraft-cdn';
+const VISIT_COUNTER_FALLBACK_BADGE = 'https://hits.sh/github.com/weiuou/TongCraft-cdn.svg?label=&color=111111';
 const FRIEND_LINKS = [
   { label: '服务器官网', href: 'https://www.tongcraft.cn/' },
   { label: '服务器地图', href: 'https://map.weiuou.art/' },
@@ -37,6 +38,7 @@ if (fs.existsSync(SKINS_DIR)) {
 const html = generateHTML(players, avatarCache.size, {
   visitCounterNamespace: VISIT_COUNTER_NAMESPACE,
   visitCounterKey: VISIT_COUNTER_KEY,
+  visitCounterFallbackBadge: VISIT_COUNTER_FALLBACK_BADGE,
   friendLinks: FRIEND_LINKS,
 });
 
@@ -49,7 +51,12 @@ function escapeHTML(value) {
 }
 
 function generateHTML(players, count, options = {}) {
-  const { visitCounterNamespace = 'weiuou', visitCounterKey = 'tongcraft-cdn', friendLinks = [] } = options;
+  const {
+    visitCounterNamespace = 'weiuou',
+    visitCounterKey = 'tongcraft-cdn',
+    visitCounterFallbackBadge = '',
+    friendLinks = [],
+  } = options;
   const cards = players.map(p => {
     const has = avatarCache.has(p.uuid);
     const name = escapeHTML(p.name);
@@ -84,6 +91,7 @@ header p{font-size:14px;margin-top:8px;color:var(--fg)}
 .site-meta a{color:inherit;text-decoration:none;border-bottom:1px solid transparent}
 .site-meta a:hover{color:var(--fg);border-color:currentColor}
 .friend-links{display:inline-flex;flex-wrap:wrap;gap:10px}
+.visit-counter-badge{height:20px;vertical-align:middle}
 .header-actions{display:flex;gap:16px;align-items:center;color:var(--fg);font-size:13px;white-space:nowrap}
 .header-actions button{border:0;background:transparent;color:inherit;cursor:pointer;font:inherit;padding:4px 2px}
 .header-actions .icon-link{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;color:inherit;border-radius:4px;text-decoration:none}
@@ -152,7 +160,7 @@ body.dark .mascot-bubble{background:rgba(245,245,245,.9);color:#111;border-color
 }
 </style></head><body>
 <header>
-  <div class="header-copy"><h1>Tongcraft Heads</h1><p>${players.length} 个玩家头颅 · ${count} 张头像缓存</p><div class="site-meta"><span><strong>访问量</strong> <span id="visitCount">--</span></span><span><strong>友链</strong> <span class="friend-links">${friendLinksMarkup}</span></span></div></div>
+  <div class="header-copy"><h1>Tongcraft Heads</h1><p>${players.length} 个玩家头颅 · ${count} 张头像缓存</p><div class="site-meta"><span><strong>本站点击量</strong> <span id="visitCount">--</span></span><span><strong>友链</strong> <span class="friend-links">${friendLinksMarkup}</span></span></div></div>
   <div class="header-actions">
     <a class="icon-link" href="https://github.com/weiuou/TongCraft-cdn" target="_blank" rel="noreferrer" aria-label="GitHub repository" title="GitHub repository"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2.16c-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.23-1.27-5.23-5.67 0-1.25.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.04 0 0 .97-.31 3.17 1.18A10.95 10.95 0 0 1 12 6.06c.98 0 1.96.13 2.88.39 2.2-1.49 3.17-1.18 3.17-1.18.63 1.58.23 2.75.11 3.04.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.38-5.25 5.66.41.36.78 1.06.78 2.14v3.16c0 .31.21.67.8.56A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/></svg></a>
     <button type="button" onclick="toggleMascot()">Mascot</button><button type="button" onclick="toggleTheme()">◐ 主题</button><button type="button" onclick="copyVisibleGive()">⛏ 复制当前指令</button>
@@ -178,7 +186,7 @@ body.dark .mascot-bubble{background:rgba(245,245,245,.9);color:#111;border-color
   }
 }
 </script>
-<script>window.__PLAYERS__ = ${JSON.stringify(players.map(p => ({ uuid: p.uuid, name: p.name, skinModel: p.skinModel || null, skinUrl: p.skinUrl || null })))};window.__VISIT_COUNTER__=${JSON.stringify({ namespace: visitCounterNamespace, key: visitCounterKey })};</script>
+<script>window.__PLAYERS__ = ${JSON.stringify(players.map(p => ({ uuid: p.uuid, name: p.name, skinModel: p.skinModel || null, skinUrl: p.skinUrl || null })))};window.__VISIT_COUNTER__=${JSON.stringify({ namespace: visitCounterNamespace, key: visitCounterKey, fallbackBadge: visitCounterFallbackBadge })};</script>
 <script>
 function toast(message){var t=document.getElementById('t');t.textContent=message;t.classList.add('on');setTimeout(function(){t.classList.remove('on')},1400)}
 function giveCommand(uuid){var p=(window.__PLAYERS__||[]).find(function(player){return player.uuid===uuid});var id=p&&p.name?p.name:uuid;return '/give @p minecraft:player_head[minecraft:profile='+JSON.stringify(id)+'] 1'}
@@ -196,7 +204,8 @@ function toggleTheme(){setTheme(!document.body.classList.contains('dark'))}
 function open3d(uuid){window.dispatchEvent(new CustomEvent('open-3d-viewer',{detail:{uuid:uuid}}))}
 function toggleMascot(){window.dispatchEvent(new CustomEvent('toggle-mascot'))}
 function visitCounterUrl(action){var cfg=window.__VISIT_COUNTER__||{};return 'https://api.countapi.xyz/'+action+'/'+encodeURIComponent(cfg.namespace||'weiuou')+'/'+encodeURIComponent(cfg.key||'tongcraft-cdn')}
-async function syncVisitCount(){var el=document.getElementById('visitCount');if(!el)return;var storageKey='tongcraft:visit:last-hit';var now=Date.now();var last=Number(localStorage.getItem(storageKey)||0);var action=last&&now-last<18e5?'get':'hit';try{var response=await fetch(visitCounterUrl(action),{cache:'no-store'});if(!response.ok)throw new Error('visit counter '+response.status);var payload=await response.json();if(action==='hit')localStorage.setItem(storageKey,String(now));el.textContent=typeof payload.value==='number'?payload.value.toLocaleString('zh-CN'):'--'}catch(error){el.textContent='--';console.warn('visit counter unavailable',error)}}
+function showVisitFallback(el){var cfg=window.__VISIT_COUNTER__||{};if(!cfg.fallbackBadge){el.textContent='--';return}el.innerHTML='';var img=document.createElement('img');img.className='visit-counter-badge';img.alt='本站点击量';img.src=cfg.fallbackBadge;el.appendChild(img)}
+async function syncVisitCount(){var el=document.getElementById('visitCount');if(!el)return;var storageKey='tongcraft:visit:last-hit';var now=Date.now();var last=Number(localStorage.getItem(storageKey)||0);var action=last&&now-last<18e5?'get':'hit';try{var response=await fetch(visitCounterUrl(action),{cache:'no-store'});if(!response.ok)throw new Error('visit counter '+response.status);var payload=await response.json();if(action==='hit')localStorage.setItem(storageKey,String(now));if(typeof payload.value==='number')el.textContent=payload.value.toLocaleString('zh-CN');else showVisitFallback(el)}catch(error){showVisitFallback(el);console.warn('visit counter unavailable, fallback badge used',error)}}
 window.copyAvatar=copyAvatar;window.copyGive=copyGive;window.copyVisibleGive=copyVisibleGive;window.f=f;window.sortCards=sortCards;window.setTheme=setTheme;window.toggleTheme=toggleTheme;window.open3d=open3d;window.toggleMascot=toggleMascot;window.summonMascotFromCard=summonMascotFromCard;
 setTheme(localStorage.getItem('theme')==='dark')
 syncVisitCount()
