@@ -15,6 +15,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const AVATARS_DIR = path.join(__dirname, '..', 'avatars');
 const SKINS_DIR = path.join(__dirname, '..', 'skins');
 const DATA_DIR = path.join(__dirname, '..', 'data');
+const RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const MAX_FETCH_RETRIES = Number.parseInt(process.env.MOJANG_FETCH_RETRIES ?? '4', 10);
+const RETRY_BASE_DELAY_MS = Number.parseInt(process.env.MOJANG_FETCH_RETRY_DELAY_MS ?? '1000', 10);
+const INTER_PLAYER_DELAY_MS = Number.parseInt(process.env.MOJANG_FETCH_INTERVAL_MS ?? '200', 10);
 
 async function readJson(filePath, fallback) {
   try {
@@ -28,9 +32,76 @@ async function writeJson(filePath, data) {
   await fs.writeFile(filePath, JSON.stringify(data, null, 2) + '\n');
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function parseRetryAfterMs(value) {
+  if (!value) return null;
+
+  const seconds = Number.parseFloat(value);
+  if (Number.isFinite(seconds)) {
+    return Math.max(0, Math.round(seconds * 1000));
+  }
+
+  const retryAt = Date.parse(value);
+  if (Number.isNaN(retryAt)) return null;
+  return Math.max(0, retryAt - Date.now());
+}
+
+async function fetchWithRetry(url, label) {
+  let lastError = null;
+
+  for (let attempt = 0; attempt <= MAX_FETCH_RETRIES; attempt++) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) return res;
+
+      const error = new Error(`${label} failed: ${res.status}`);
+      error.retryable = RETRYABLE_STATUSES.has(res.status);
+      if (!error.retryable || attempt === MAX_FETCH_RETRIES) {
+        throw error;
+      }
+
+      const retryAfterMs = parseRetryAfterMs(res.headers.get('retry-after'));
+      const backoffMs = retryAfterMs ?? (RETRY_BASE_DELAY_MS * (2 ** attempt));
+      await sleep(backoffMs);
+      continue;
+    } catch (error) {
+      lastError = error;
+      if (attempt === MAX_FETCH_RETRIES || error.retryable === false) break;
+      await sleep(RETRY_BASE_DELAY_MS * (2 ** attempt));
+    }
+  }
+
+  throw lastError ?? new Error(`${label} failed`);
+}
+
+async function getCachedAvatarFallback(player, metaEntry) {
+  const avatarPath = path.join(AVATARS_DIR, `${player.uuid}.png`);
+
+  try {
+    const avatarStat = await fs.stat(avatarPath);
+    if (!avatarStat.isFile()) return null;
+
+    return {
+      updatedAt: metaEntry?.updatedAt ?? player.avatarUpdatedAt ?? avatarStat.mtime.toISOString(),
+      skinModel: metaEntry?.skinModel ?? player.skinModel ?? null,
+      skinUrl: metaEntry?.skinUrl ?? player.skinUrl ?? null,
+      skinTextureUpdatedAt: metaEntry?.skinTextureUpdatedAt ?? player.skinTextureUpdatedAt ?? null,
+      width: metaEntry?.skinWidth ?? null,
+      height: metaEntry?.skinHeight ?? null
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function getSkinProfile(uuid) {
-  const res = await fetch(`https://sessionserver.mojang.com/session/minecraft/profile/${uuid}`);
-  if (!res.ok) throw new Error(`Profile fetch failed: ${res.status}`);
+  const res = await fetchWithRetry(
+    `https://sessionserver.mojang.com/session/minecraft/profile/${uuid}`,
+    'Profile fetch'
+  );
   const data = await res.json();
   const prop = data.properties?.find(p => p.name === 'textures');
   if (!prop) throw new Error('No textures property');
@@ -48,8 +119,7 @@ async function getSkinProfile(uuid) {
 async function fetchAndCrop(uuid) {
   const skinProfile = await getSkinProfile(uuid);
   const { skinUrl, skinModel, skinTextureUpdatedAt } = skinProfile;
-  const res = await fetch(skinUrl);
-  if (!res.ok) throw new Error(`Skin download failed: ${res.status}`);
+  const res = await fetchWithRetry(skinUrl, 'Skin download');
   const skinBuffer = Buffer.from(await res.arrayBuffer());
 
   const { width, height } = await sharp(skinBuffer).metadata();
@@ -98,7 +168,7 @@ async function main() {
     ? players.filter(p => args.includes(p.name))
     : players;
 
-  let ok = 0, fail = 0;
+  let ok = 0, fallback = 0, fail = 0;
   for (const player of targets) {
     process.stdout.write(`  ${player.name} (${player.uuid})... `);
     try {
@@ -123,17 +193,40 @@ async function main() {
       console.log(`ok (${result.skinModel})`);
       ok++;
     } catch (e) {
-      console.log(`FAILED: ${e.message}`);
-      fail++;
+      const cached = await getCachedAvatarFallback(player, meta[player.uuid]);
+      if (cached) {
+        player.hasAvatar = true;
+        player.avatarUpdatedAt = cached.updatedAt;
+        if (cached.skinModel) player.skinModel = cached.skinModel;
+        if (cached.skinUrl) player.skinUrl = cached.skinUrl;
+        if (cached.skinTextureUpdatedAt) player.skinTextureUpdatedAt = cached.skinTextureUpdatedAt;
+        meta[player.uuid] = {
+          ...(meta[player.uuid] || {}),
+          uuid: player.uuid,
+          name: player.name,
+          filename: `${player.uuid}.png`,
+          updatedAt: cached.updatedAt,
+          skinModel: cached.skinModel ?? meta[player.uuid]?.skinModel,
+          skinUrl: cached.skinUrl ?? meta[player.uuid]?.skinUrl,
+          skinTextureUpdatedAt: cached.skinTextureUpdatedAt ?? meta[player.uuid]?.skinTextureUpdatedAt,
+          skinWidth: cached.width ?? meta[player.uuid]?.skinWidth,
+          skinHeight: cached.height ?? meta[player.uuid]?.skinHeight
+        };
+        console.log(`fallback to cached png (${e.message})`);
+        fallback++;
+      } else {
+        console.log(`FAILED: ${e.message}`);
+        fail++;
+      }
     }
-    await new Promise(r => setTimeout(r, 200));
+    await sleep(INTER_PLAYER_DELAY_MS);
   }
 
   playersData.lastUpdated = new Date().toISOString();
   await writeJson(playersPath, playersData);
   await writeJson(metaPath, meta);
 
-  console.log(`\nDone! ${ok} ok, ${fail} failed.`);
+  console.log(`\nDone! ${ok} ok, ${fallback} fallback, ${fail} failed.`);
 }
 
 main().catch(console.error);
