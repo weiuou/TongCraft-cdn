@@ -141,6 +141,16 @@ body.dark .actions .swatch{background:#f5f5f5;color:#111}
 .viewer-part-actions button{flex:1;padding:6px 8px;border:1px solid rgba(255,255,255,.16);border-radius:6px;background:#2b2b2b;color:#fff;font-size:12px;cursor:pointer}
 .viewer-part-actions button:hover{background:#383838}
 .viewer-control-label{font-size:12px;color:#aaa;display:flex;flex-direction:column;gap:6px}
+.viewer-export{margin-top:auto;padding-top:12px;border-top:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;gap:8px}
+.viewer-export-row{display:grid;grid-template-columns:1fr 42px;gap:8px;align-items:end}
+.viewer-export-row input{width:100%;height:32px;padding:0 8px;border:1px solid #444;border-radius:6px;background:#2f2f2f;color:#fff;font-size:13px;outline:none}
+.viewer-export-unit{height:32px;display:flex;align-items:center;justify-content:center;border:1px solid #444;border-radius:6px;color:#aaa;font-size:12px}
+.viewer-export button{width:100%;padding:8px 10px;border:1px solid rgba(255,255,255,.2);border-radius:6px;background:#f2f2f2;color:#111;font-size:12px;font-weight:800;cursor:pointer}
+.viewer-export button:hover{background:#fff}
+.viewer-export button:disabled{cursor:not-allowed;opacity:.5}
+.viewer-export .viewer-export-secondary{background:#2b2b2b;color:#fff}
+.viewer-export .viewer-export-secondary:hover{background:#383838}
+.viewer-export-note{font-size:10px;line-height:1.45;color:#888}
 .viewer-stage{position:relative;min-width:0;background:#1a1a1a}
 .viewer-stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .viewer-loading{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:13px;color:#888;pointer-events:none}
@@ -181,6 +191,7 @@ body.dark .mascot-bubble{background:rgba(245,245,245,.9);color:#111;border-color
   "imports": {
     "react": "https://esm.sh/react@18.3.1",
     "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "fflate": "https://esm.sh/fflate@0.8.2",
     "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
     "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
   }
@@ -213,8 +224,11 @@ syncVisitCount()
 <script type="module">
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { strToU8, zipSync } from 'fflate';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLExporter } from 'three/addons/exporters/STLExporter.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const players = window.__PLAYERS__ || [];
 const h = React.createElement;
@@ -236,6 +250,42 @@ const ANIMATIONS = [
   ['wave', 'Wave'],
   ['crouch', 'Crouch']
 ];
+const DEFAULT_PRINT_HEIGHT = 64;
+
+function downloadBlob(blob, filename) {
+  const href = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = href;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(href), 1000);
+}
+
+function safeFilename(value) {
+  return String(value || 'player').trim().replace(/[^a-z0-9._-]+/gi, '-') || 'player';
+}
+
+function disposeModel(root) {
+  root.traverse(node => {
+    if (!node.isMesh) return;
+    node.geometry?.dispose?.();
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    materials.forEach(material => material?.dispose?.());
+  });
+}
+
+function xmlEscape(value) {
+  return String(value).replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;'
+  })[character] || character);
+}
+
+function coordinate(value) {
+  if (Math.abs(value) < 0.000005) return '0';
+  return Number(value.toFixed(5)).toString();
+}
 
 function getRegion(img, u, v, uw, uh) {
   const c = document.createElement('canvas');
@@ -243,6 +293,7 @@ function getRegion(img, u, v, uw, uh) {
   c.height = uh;
   c.getContext('2d').drawImage(img, u, v, uw, uh, 0, 0, uw, uh);
   const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
   tex.magFilter = THREE.NearestFilter;
   tex.minFilter = THREE.NearestFilter;
   return tex;
@@ -403,6 +454,294 @@ function animateBones(group, action, elapsed) {
   }
 }
 
+function partForMesh(mesh, root) {
+  let owner = mesh;
+  while (owner && owner !== root) {
+    if (owner.userData.part) return owner.userData.part;
+    owner = owner.parent;
+  }
+  return null;
+}
+
+function pixelPlateGeometry(face, bounds, columns, rows, column, row, inset, outset, overlap = 1) {
+  const size = bounds.getSize(new THREE.Vector3());
+  const center = bounds.getCenter(new THREE.Vector3());
+  const thickness = inset + outset;
+  const surfaceOffset = (outset - inset) / 2;
+  let width;
+  let height;
+  let depth;
+  let x = center.x;
+  let y = center.y;
+  let z = center.z;
+
+  if (face === 0 || face === 1) {
+    const cellHeight = size.y / rows;
+    const cellDepth = size.z / columns;
+    width = thickness;
+    height = cellHeight * overlap;
+    depth = cellDepth * overlap;
+    x = face === 0 ? bounds.max.x + surfaceOffset : bounds.min.x - surfaceOffset;
+    y = bounds.max.y - (row + 0.5) * cellHeight;
+    z = face === 0
+      ? bounds.max.z - (column + 0.5) * cellDepth
+      : bounds.min.z + (column + 0.5) * cellDepth;
+  } else if (face === 2 || face === 3) {
+    const cellWidth = size.x / columns;
+    const cellDepth = size.z / rows;
+    width = cellWidth * overlap;
+    height = thickness;
+    depth = cellDepth * overlap;
+    x = bounds.min.x + (column + 0.5) * cellWidth;
+    y = face === 2 ? bounds.max.y + surfaceOffset : bounds.min.y - surfaceOffset;
+    z = face === 2
+      ? bounds.min.z + (row + 0.5) * cellDepth
+      : bounds.max.z - (row + 0.5) * cellDepth;
+  } else {
+    const cellWidth = size.x / columns;
+    const cellHeight = size.y / rows;
+    width = cellWidth * overlap;
+    height = cellHeight * overlap;
+    depth = thickness;
+    x = face === 4
+      ? bounds.min.x + (column + 0.5) * cellWidth
+      : bounds.max.x - (column + 0.5) * cellWidth;
+    y = bounds.max.y - (row + 0.5) * cellHeight;
+    z = face === 4 ? bounds.max.z + surfaceOffset : bounds.min.z - surfaceOffset;
+  }
+
+  const geometry = new THREE.BoxGeometry(width, height, depth);
+  geometry.translate(x, y, z);
+  return geometry;
+}
+
+function normalizePrintableGroup(printable, requestedHeight) {
+  printable.updateMatrixWorld(true);
+  const initialBounds = new THREE.Box3().setFromObject(printable);
+  const initialSize = initialBounds.getSize(new THREE.Vector3());
+  if (!Number.isFinite(initialSize.y) || initialSize.y <= 0) throw new Error('模型尺寸无效');
+  const height = THREE.MathUtils.clamp(Number(requestedHeight) || DEFAULT_PRINT_HEIGHT, 32, 256);
+  printable.scale.setScalar(height / initialSize.y);
+  printable.rotation.x = Math.PI / 2;
+  printable.updateMatrixWorld(true);
+  const printBounds = new THREE.Box3().setFromObject(printable);
+  const center = printBounds.getCenter(new THREE.Vector3());
+  printable.position.x -= center.x;
+  printable.position.y -= center.y;
+  printable.position.z -= printBounds.min.z;
+  printable.updateMatrixWorld(true);
+  return height;
+}
+
+function mergePixelPlates(printable) {
+  const byParent = new Map();
+  printable.traverse(node => {
+    if (!node.isMesh || !node.userData.pixelPlate || !node.parent) return;
+    const groups = byParent.get(node.parent) || new Map();
+    const key = node.userData.printColor + ':' + (node.userData.outerLayer ? 'outer' : 'base');
+    const meshes = groups.get(key) || [];
+    meshes.push(node);
+    groups.set(key, meshes);
+    byParent.set(node.parent, groups);
+  });
+  byParent.forEach((groups, parent) => {
+    groups.forEach(meshes => {
+      const mergedGeometry = mergeGeometries(meshes.map(mesh => mesh.geometry), false);
+      if (!mergedGeometry) return;
+      const merged = new THREE.Mesh(mergedGeometry, meshes[0].material);
+      merged.userData = { ...meshes[0].userData };
+      meshes.forEach(mesh => {
+        parent.remove(mesh);
+        mesh.geometry.dispose();
+      });
+      parent.add(merged);
+    });
+  });
+}
+
+function pixelizedPlayerModel(source, visibility, requestedHeight, requestedRelief, options = {}) {
+  const printable = source.clone(true);
+  printable.position.set(0, 0, 0);
+  printable.rotation.set(0, 0, 0);
+  printable.scale.set(1, 1, 1);
+  animateBones(printable, 'none', 0);
+  printable.updateMatrixWorld(true);
+
+  const materialCache = new Map();
+  const materialFor = color => {
+    if (!materialCache.has(color)) materialCache.set(color, new THREE.MeshStandardMaterial({ color, roughness: 0.78, metalness: 0 }));
+    return materialCache.get(color);
+  };
+  const coreMaterial = materialFor('#505050');
+  const sourceMeshes = [];
+  printable.traverse(node => { if (node.isMesh) sourceMeshes.push(node); });
+  let pixelCount = 0;
+  const targetHeight = THREE.MathUtils.clamp(Number(requestedHeight) || DEFAULT_PRINT_HEIGHT, 32, 256);
+  const relief = THREE.MathUtils.clamp(Number(requestedRelief) || 0.8, 0.4, 2);
+  const reliefInModelUnits = relief * 4 / targetHeight;
+  const pixelOverlap = options.previewMode ? 1.035 : 1;
+  const baseInset = Math.min(reliefInModelUnits, 0.09);
+  const outerGap = 0.04;
+
+  sourceMeshes.forEach(mesh => {
+    const part = partForMesh(mesh, printable);
+    const partVisible = !part || visibility[part] !== false;
+    const isOuter = Boolean(mesh.userData.outerLayer);
+    if (!partVisible || (isOuter && visibility.outerLayer === false)) {
+      mesh.parent?.remove(mesh);
+      return;
+    }
+
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    mesh.geometry.computeBoundingBox();
+    const bounds = mesh.geometry.boundingBox;
+    if (options.previewMode && !isOuter) {
+      mesh.material = materials.map(material => new THREE.MeshStandardMaterial({
+        map: material?.map || null,
+        transparent: true,
+        alphaTest: 0.5,
+        roughness: 0.78,
+        metalness: 0
+      }));
+      return;
+    }
+    const inset = isOuter ? outerGap : baseInset;
+    const outset = isOuter ? reliefInModelUnits : 0;
+    materials.slice(0, 6).forEach((material, face) => {
+      const image = material?.map?.image;
+      const context = image?.getContext?.('2d');
+      if (!context || !image.width || !image.height) return;
+      const pixels = context.getImageData(0, 0, image.width, image.height).data;
+      for (let row = 0; row < image.height; row++) {
+        for (let column = 0; column < image.width; column++) {
+          const offset = (row * image.width + column) * 4;
+          if (pixels[offset + 3] < 16) continue;
+          const color = '#' + [pixels[offset], pixels[offset + 1], pixels[offset + 2]]
+            .map(channel => channel.toString(16).padStart(2, '0'))
+            .join('');
+          const geometry = pixelPlateGeometry(face, bounds, image.width, image.height, column, row, inset, outset, pixelOverlap);
+          geometry.applyMatrix4(mesh.matrix);
+          const plate = new THREE.Mesh(geometry, materialFor(color));
+          plate.userData = {
+            printColor: color.toUpperCase(),
+            pixelPlate: true,
+            part,
+            outerLayer: isOuter
+          };
+          mesh.parent?.add(plate);
+          pixelCount++;
+        }
+      }
+    });
+
+    if (isOuter) mesh.parent?.remove(mesh);
+    else {
+      const size = bounds.getSize(new THREE.Vector3());
+      const center = bounds.getCenter(new THREE.Vector3());
+      mesh.geometry = new THREE.BoxGeometry(
+        Math.max(0.01, size.x - baseInset * 2),
+        Math.max(0.01, size.y - baseInset * 2),
+        Math.max(0.01, size.z - baseInset * 2)
+      );
+      mesh.geometry.translate(center.x, center.y, center.z);
+      mesh.material = coreMaterial;
+    }
+  });
+
+  if (!pixelCount && !options.previewMode) throw new Error('皮肤中没有可导出的颜色像素');
+  mergePixelPlates(printable);
+  printable.traverse(node => {
+    if (!node.isMesh) return;
+    node.castShadow = !options.previewMode || !node.userData.pixelPlate;
+    node.receiveShadow = true;
+  });
+  return { printable, relief, pixelCount, targetHeight };
+}
+
+function multicolorPlayerModel(source, visibility, requestedHeight, requestedRelief) {
+  const result = pixelizedPlayerModel(source, visibility, requestedHeight, requestedRelief);
+  const { printable, relief, pixelCount, targetHeight } = result;
+  const height = normalizePrintableGroup(printable, targetHeight);
+  return { printable, height, relief, pixelCount };
+}
+
+function meshColor(mesh) {
+  if (mesh.userData.printColor) return mesh.userData.printColor;
+  const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  const material = materials.find(candidate => candidate?.color);
+  return '#' + (material?.color?.getHexString(THREE.SRGBColorSpace) || '505050').toUpperCase();
+}
+
+function printableParts(printable) {
+  const byColor = new Map();
+  printable.traverse(node => {
+    if (!node.isMesh) return;
+    const color = meshColor(node);
+    const meshes = byColor.get(color) || [];
+    meshes.push(node);
+    byColor.set(color, meshes);
+  });
+  return Array.from(byColor, entry => ({ color: entry[0], meshes: entry[1] }));
+}
+
+function partMeshXml(part) {
+  const vertices = [];
+  const triangles = [];
+  let vertexOffset = 0;
+  part.meshes.forEach(source => {
+    const geometry = source.geometry.clone();
+    geometry.applyMatrix4(source.matrixWorld);
+    const position = geometry.getAttribute('position');
+    for (let index = 0; index < position.count; index++) {
+      vertices.push('<vertex x="' + coordinate(position.getX(index)) + '" y="' + coordinate(position.getY(index)) + '" z="' + coordinate(position.getZ(index)) + '"/>');
+    }
+    const indices = geometry.index;
+    if (indices) {
+      for (let index = 0; index < indices.count; index += 3) {
+        triangles.push('<triangle v1="' + (vertexOffset + indices.getX(index)) + '" v2="' + (vertexOffset + indices.getX(index + 1)) + '" v3="' + (vertexOffset + indices.getX(index + 2)) + '"/>');
+      }
+    } else {
+      for (let index = 0; index < position.count; index += 3) {
+        triangles.push('<triangle v1="' + (vertexOffset + index) + '" v2="' + (vertexOffset + index + 1) + '" v3="' + (vertexOffset + index + 2) + '"/>');
+      }
+    }
+    vertexOffset += position.count;
+    geometry.dispose();
+  });
+  return '<mesh><vertices>' + vertices.join('') + '</vertices><triangles>' + triangles.join('') + '</triangles></mesh>';
+}
+
+function create3mf(parts, playerName) {
+  const materialXml = parts.map((part, index) =>
+    '<base name="Color ' + (index + 1) + ' ' + xmlEscape(part.color) + '" displaycolor="' + part.color + 'FF"/>'
+  ).join('');
+  const objectXml = parts.map((part, index) =>
+    '<object id="' + (index + 2) + '" type="model" name="' + xmlEscape(part.color) + '" pid="1" pindex="' + index + '">' + partMeshXml(part) + '</object>'
+  ).join('');
+  const assemblyId = parts.length + 2;
+  const components = parts.map((part, index) => '<component objectid="' + (index + 2) + '"/>').join('');
+  const modelXml = '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<model unit="millimeter" xml:lang="zh-CN" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">' +
+    '<metadata name="Title">Tongcraft ' + xmlEscape(playerName) + '</metadata>' +
+    '<metadata name="Application">Tongcraft CDN</metadata>' +
+    '<metadata name="Description">Multicolor Minecraft player model generated from skin pixels</metadata>' +
+    '<resources><basematerials id="1">' + materialXml + '</basematerials>' + objectXml +
+    '<object id="' + assemblyId + '" type="model" name="' + xmlEscape(playerName) + ' multicolor assembly"><components>' + components + '</components></object>' +
+    '</resources><build><item objectid="' + assemblyId + '"/></build></model>';
+  const contentTypes = '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+    '<Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>';
+  const relationships = '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>';
+  return zipSync({
+    '[Content_Types].xml': strToU8(contentTypes),
+    '_rels/.rels': strToU8(relationships),
+    '3D/3dmodel.model': strToU8(modelXml)
+  }, { level: 6 });
+}
+
 function applyMascotLook(group, look) {
   const head = group.getObjectByName('head');
   const body = group.getObjectByName('body');
@@ -509,6 +848,8 @@ function ViewerModal() {
   const [visibility, setVisibility] = useState(DEFAULT_VISIBILITY);
   const [autoRotate, setAutoRotate] = useState(false);
   const [animation, setAnimation] = useState('idle');
+  const [printHeight, setPrintHeight] = useState(String(DEFAULT_PRINT_HEIGHT));
+  const [printRelief, setPrintRelief] = useState('0.8');
   const canvasRef = useRef(null);
   const viewerRef = useRef(null);
   const visibilityRef = useRef(visibility);
@@ -554,8 +895,12 @@ function ViewerModal() {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a1a1a);
+    scene.background = new THREE.Color(0x171717);
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
     camera.position.set(0, 0, 5);
     const controls = new OrbitControls(camera, canvas);
@@ -564,11 +909,25 @@ function ViewerModal() {
     controls.minDistance = 2;
     controls.maxDistance = 10;
     const playerGroup = new THREE.Group();
+    const sourceGroup = new THREE.Group();
     scene.add(playerGroup);
-    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight.position.set(2, 3, 3);
+    scene.add(new THREE.HemisphereLight(0xf4f6ff, 0x302a25, 1.15));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 2.1);
+    dirLight.position.set(3.5, 5.5, 4.5);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.set(1024, 1024);
+    dirLight.shadow.camera.left = -4;
+    dirLight.shadow.camera.right = 4;
+    dirLight.shadow.camera.top = 5;
+    dirLight.shadow.camera.bottom = -5;
     scene.add(dirLight);
+    const platform = new THREE.Mesh(
+      new THREE.CircleGeometry(3.2, 64),
+      new THREE.MeshStandardMaterial({ color: 0x292929, roughness: 1, metalness: 0 })
+    );
+    platform.rotation.x = -Math.PI / 2;
+    platform.receiveShadow = true;
+    scene.add(platform);
 
     const resize = () => {
       const box = canvas.parentElement.getBoundingClientRect();
@@ -591,12 +950,16 @@ function ViewerModal() {
       renderer.render(scene, camera);
     };
     animate();
-    viewerRef.current = { playerGroup, resize };
+    viewerRef.current = { playerGroup, sourceGroup, platform, resize };
 
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener('resize', resize);
       controls.dispose();
+      disposeModel(playerGroup);
+      disposeModel(sourceGroup);
+      platform.geometry.dispose();
+      platform.material.dispose();
       renderer.dispose();
       viewerRef.current = null;
     };
@@ -608,8 +971,18 @@ function ViewerModal() {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      buildPlayer(viewerRef.current.playerGroup, img, player.skinModel, player.uuid);
-      applyPartVisibility(viewerRef.current.playerGroup, visibilityRef.current);
+      const viewer = viewerRef.current;
+      if (!viewer) return;
+      disposeModel(viewer.sourceGroup);
+      buildPlayer(viewer.sourceGroup, img, player.skinModel, player.uuid);
+      const preview = pixelizedPlayerModel(viewer.sourceGroup, DEFAULT_VISIBILITY, printHeight, printRelief, { previewMode: true }).printable;
+      disposeModel(viewer.playerGroup);
+      while (viewer.playerGroup.children.length) viewer.playerGroup.remove(viewer.playerGroup.children[0]);
+      viewer.playerGroup.add(preview);
+      applyPartVisibility(viewer.playerGroup, visibilityRef.current);
+      preview.updateMatrixWorld(true);
+      const bounds = new THREE.Box3().setFromObject(preview);
+      viewer.platform.position.y = bounds.min.y - 0.025;
       viewerRef.current.resize();
       setLoading(false);
     };
@@ -618,7 +991,7 @@ function ViewerModal() {
       else setLoading(false);
     };
     img.src = 'skins/' + player.uuid + '.png?' + Date.now();
-  }, [open, player]);
+  }, [open, player, printHeight, printRelief]);
 
   useEffect(() => {
     if (!viewerRef.current) return;
@@ -631,6 +1004,39 @@ function ViewerModal() {
 
   const togglePart = key => {
     setVisibility(current => ({ ...current, [key]: !current[key] }));
+  };
+
+  const exportStl = () => {
+    if (loading || !viewerRef.current?.playerGroup) return;
+    try {
+      const { printable, height, relief, pixelCount } = multicolorPlayerModel(viewerRef.current.sourceGroup, visibility, printHeight, printRelief);
+      const data = new STLExporter().parse(printable, { binary: true });
+      const filename = 'tongcraft-' + safeFilename(player.name) + '-' + height + 'mm.stl';
+      downloadBlob(new Blob([data], { type: 'model/stl' }), filename);
+      window.__lastModelExport = { filename, height, relief, pixelCount, byteLength: data.byteLength };
+      toast('STL 模型已导出');
+      mascotSay(player.name + ' 的打印模型准备好了！');
+    } catch (error) {
+      console.error('STL export failed', error);
+      toast(error.message || 'STL 导出失败');
+    }
+  };
+
+  const export3mf = () => {
+    if (loading || !viewerRef.current?.playerGroup) return;
+    try {
+      const { printable, height, relief, pixelCount } = multicolorPlayerModel(viewerRef.current.sourceGroup, visibility, printHeight, printRelief);
+      const parts = printableParts(printable);
+      const data = create3mf(parts, player.name);
+      const filename = 'tongcraft-' + safeFilename(player.name) + '-' + height + 'mm-multicolor.3mf';
+      downloadBlob(new Blob([data], { type: 'model/3mf' }), filename);
+      window.__last3mfExport = { filename, height, relief, byteLength: data.byteLength, colorCount: parts.length, pixelCount };
+      toast('多色 3MF 模型已导出');
+      mascotSay(player.name + ' 的彩色打印模型准备好了！');
+    } catch (error) {
+      console.error('3MF export failed', error);
+      toast(error.message || '3MF 导出失败');
+    }
   };
 
   if (!open || !player) return null;
@@ -659,7 +1065,7 @@ function ViewerModal() {
             ANIMATIONS.map(([value, label]) => h('option', { key: value, value }, label))
           )
         ),
-        h('div', { className: 'viewer-parts' },
+          h('div', { className: 'viewer-parts' },
           PARTS.map(([key, label]) => h('label', { key, className: key === 'outerLayer' ? 'viewer-part viewer-part-wide' : 'viewer-part' },
             h('input', { type: 'checkbox', checked: visibility[key], onChange: () => togglePart(key) }),
             h('span', null, label)
@@ -668,6 +1074,35 @@ function ViewerModal() {
             h('button', { type: 'button', onClick: () => setAllParts(true) }, 'All'),
             h('button', { type: 'button', onClick: () => setAllParts(false) }, 'None')
           )
+        ),
+        h('div', { className: 'viewer-export' },
+          h('div', { className: 'viewer-export-row' },
+            h('label', { className: 'viewer-control-label' },
+              h('span', null, 'Print Height'),
+              h('input', {
+                type: 'number', min: 32, max: 256, step: 1,
+                value: printHeight,
+                onChange: event => setPrintHeight(event.target.value),
+                'aria-label': 'Print Height'
+              })
+            ),
+            h('span', { className: 'viewer-export-unit' }, 'mm')
+          ),
+          h('div', { className: 'viewer-export-row' },
+            h('label', { className: 'viewer-control-label' },
+              h('span', null, 'Pixel Relief'),
+              h('input', {
+                type: 'number', min: 0.4, max: 2, step: 0.1,
+                value: printRelief,
+                onChange: event => setPrintRelief(event.target.value),
+                'aria-label': 'Pixel Relief'
+              })
+            ),
+            h('span', { className: 'viewer-export-unit' }, 'mm')
+          ),
+          h('button', { type: 'button', onClick: export3mf, disabled: loading, 'aria-label': 'Export multicolor 3MF' }, '导出多色 3MF'),
+          h('button', { className: 'viewer-export-secondary', type: 'button', onClick: exportStl, disabled: loading, 'aria-label': 'Export STL' }, '导出单色 STL'),
+          h('div', { className: 'viewer-export-note' }, '中立站姿 · 实体像素表层 · 3MF 保留皮肤颜色，STL 兼容所有切片软件')
         )
       ),
       h('div', { className: 'viewer-stage' },
@@ -1134,6 +1569,7 @@ function getRegion(img, u, v, uw, uh) {
   c.width = uw; c.height = uh;
   c.getContext('2d').drawImage(img, u, v, uw, uh, 0, 0, uw, uh);
   const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
   tex.magFilter = THREE.NearestFilter;
   tex.minFilter = THREE.NearestFilter;
   return tex;
