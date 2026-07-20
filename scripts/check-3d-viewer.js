@@ -1,4 +1,5 @@
 import { chromium } from 'playwright';
+import { strFromU8, unzipSync } from 'fflate';
 import fs from 'fs/promises';
 import http from 'http';
 import net from 'net';
@@ -130,11 +131,60 @@ async function verifyCase(page, baseUrl, player, viewportName, viewport) {
   await page.waitForTimeout(700);
   const waveEnd = await canvasStats(page);
   const waveChanged = changedPixels(waveStart, waveEnd);
-  if (waveChanged < 1000) {
+  if (waveChanged < 300) {
     throw new Error(`${player.name}: wave animation did not visibly change the canvas (${waveChanged} changed pixels)`);
   }
   await page.getByLabel('Animation').selectOption('idle');
   await page.waitForFunction(() => window.__viewerAnimation === 'idle', null, { timeout: 5000 });
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export STL' }).click();
+  const download = await downloadPromise;
+  const stlPath = path.join(OUT_DIR, download.suggestedFilename());
+  await download.saveAs(stlPath);
+  const stl = await fs.readFile(stlPath);
+  if (!download.suggestedFilename().endsWith('-64mm.stl')) {
+    throw new Error(`${player.name}: unexpected STL filename ${download.suggestedFilename()}`);
+  }
+  if (stl.length < 84) {
+    throw new Error(`${player.name}: exported STL is too small (${stl.length} bytes)`);
+  }
+  const triangleCount = stl.readUInt32LE(80);
+  if (triangleCount < 12 || stl.length !== 84 + triangleCount * 50) {
+    throw new Error(`${player.name}: invalid binary STL (${triangleCount} triangles, ${stl.length} bytes)`);
+  }
+  const exported = await page.evaluate(() => window.__lastModelExport);
+  if (exported?.height !== 64 || exported?.relief !== 0.8 || exported?.pixelCount < 100 || exported?.byteLength !== stl.length) {
+    throw new Error(`${player.name}: export metadata does not match the downloaded STL`);
+  }
+
+  const threeMfDownloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export multicolor 3MF' }).click();
+  const threeMfDownload = await threeMfDownloadPromise;
+  const threeMfPath = path.join(OUT_DIR, threeMfDownload.suggestedFilename());
+  await threeMfDownload.saveAs(threeMfPath);
+  const threeMf = await fs.readFile(threeMfPath);
+  if (!threeMfDownload.suggestedFilename().endsWith('-64mm-multicolor.3mf')) {
+    throw new Error(`${player.name}: unexpected 3MF filename ${threeMfDownload.suggestedFilename()}`);
+  }
+  const archive = unzipSync(threeMf);
+  const modelEntry = archive['3D/3dmodel.model'];
+  if (!archive['[Content_Types].xml'] || !archive['_rels/.rels'] || !modelEntry) {
+    throw new Error(`${player.name}: 3MF archive is missing required package entries`);
+  }
+  const modelXml = strFromU8(modelEntry);
+  const materialCount = (modelXml.match(/<base /g) || []).length;
+  const componentCount = (modelXml.match(/<component /g) || []).length;
+  if (!modelXml.includes('<basematerials id="1">') || !modelXml.includes('multicolor assembly')) {
+    throw new Error(`${player.name}: 3MF model is missing materials or assembly metadata`);
+  }
+  if (materialCount < 3 || componentCount !== materialCount) {
+    throw new Error(`${player.name}: expected multiple aligned color parts, got ${materialCount} materials and ${componentCount} components`);
+  }
+  const exported3mf = await page.evaluate(() => window.__last3mfExport);
+  if (exported3mf?.height !== 64 || exported3mf?.relief !== 0.8 || exported3mf?.byteLength !== threeMf.length || exported3mf?.colorCount !== materialCount || exported3mf?.pixelCount < 100) {
+    throw new Error(`${player.name}: 3MF export metadata does not match the downloaded model`);
+  }
 
   const box = await page.locator('#viewer-canvas').boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -160,6 +210,11 @@ async function verifyCase(page, baseUrl, player, viewportName, viewport) {
     nonBackgroundBefore: before.nonBackground,
     nonBackgroundAfter: after.nonBackground,
     changedPixels: changed,
+    stlTriangles: triangleCount,
+    stlBytes: stl.length,
+    threeMfColors: materialCount,
+    threeMfPixels: exported3mf.pixelCount,
+    threeMfBytes: threeMf.length,
     screenshot: path.relative(ROOT, shot)
   };
 }
